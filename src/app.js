@@ -88,6 +88,16 @@ const PIANO_SHARP = {
   KeyY: 5,
   KeyU: 6,
 };
+// 下排 = 低一个八度的白键（简谱低音，显示为 1. 2. …）
+const PIANO_LOW = {
+  KeyZ: 1,
+  KeyX: 2,
+  KeyC: 3,
+  KeyV: 4,
+  KeyB: 5,
+  KeyN: 6,
+  KeyM: 7,
+};
 const LETTER_DEGREES = {
   KeyA: 1,
   KeyS: 2,
@@ -621,6 +631,7 @@ function noteLabelForCode(code, instrument) {
   if (instrument.id === 'piano') {
     if (PIANO_MAIN[code]) return { note: String(PIANO_MAIN[code]), mod: 'base' };
     if (PIANO_SHARP[code]) return { note: `#${PIANO_SHARP[code]}`, mod: 'base' };
+    if (PIANO_LOW[code]) return { note: `${PIANO_LOW[code]}.`, mod: 'base' };
     return null;
   }
   if (instrument.id === 'guitar') {
@@ -1859,8 +1870,12 @@ function getMappingForCode(code, modifiers) {
 
   let degree = 0;
   let isHalf = false;
+  let isLowRow = false;
   if (instrument.id === 'piano') {
-    if (PIANO_MAIN[code]) degree = PIANO_MAIN[code];
+    if (PIANO_LOW[code]) {
+      degree = PIANO_LOW[code];
+      isLowRow = true;
+    } else if (PIANO_MAIN[code]) degree = PIANO_MAIN[code];
     else if (PIANO_SHARP[code]) {
       degree = PIANO_SHARP[code];
       isHalf = true;
@@ -1872,6 +1887,8 @@ function getMappingForCode(code, modifiers) {
 
   let octave = state.octaveOffset;
   if (instrument.id === 'piano') {
+    // 下排本身就是低八度；Shift 再升、Ctrl 再降，可叠加出更低/还原音区
+    if (isLowRow) octave -= 1;
     if (shift) octave += 1;
     else if (ctrl) octave -= 1;
   } else {
@@ -1887,7 +1904,7 @@ function getMappingForCode(code, modifiers) {
   return {
     midi,
     mod: 'base',
-    label: `${isHalf ? '#' : ''}${degree}${octave > 0 ? "'".repeat(octave) : ''}`,
+    label: `${isHalf ? '#' : ''}${degree}${octave > 0 ? "'".repeat(octave) : octave < 0 ? '.'.repeat(-octave) : ''}`,
   };
 }
 
