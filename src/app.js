@@ -41,6 +41,7 @@ import {
 const THEME_KEY = 'floatnote.theme.v1';
 const LIBRARY_KEY = 'floatnote.library.v1';
 const DEMO_SEED_KEY = 'floatnote.demo-seeded.v1';
+const LAYOUT_KEY = 'floatnote.keyboard-layout.v1';
 const DEFAULT_THEME = Object.freeze({
   color: '#a9c4ee',
   brightness: 1,
@@ -97,6 +98,16 @@ const PIANO_LOW = {
   KeyB: 5,
   KeyN: 6,
   KeyM: 7,
+};
+// 简谱音高布局：上排 = 高一个八度的白键（简谱高音，显示为 1' 2' …）
+const PIANO_HIGH = {
+  KeyQ: 1,
+  KeyW: 2,
+  KeyE: 3,
+  KeyR: 4,
+  KeyT: 5,
+  KeyY: 6,
+  KeyU: 7,
 };
 const LETTER_DEGREES = {
   KeyA: 1,
@@ -189,6 +200,9 @@ const els = {
   stageLoading: document.getElementById('stageLoading'),
   stageEffectName: document.getElementById('stageEffectName'),
   keyboardStrip: document.getElementById('keyboardStrip'),
+  layoutSwitch: document.getElementById('layoutSwitch'),
+  layoutPianoBtn: document.getElementById('layoutPianoBtn'),
+  layoutDegreeBtn: document.getElementById('layoutDegreeBtn'),
 
   playBtn: document.getElementById('playBtn'),
   playIcon: document.getElementById('playIcon'),
@@ -236,6 +250,7 @@ const els = {
 
 const state = {
   instrumentId: 'piano',
+  keyboardLayout: 'piano', // piano = 真实钢琴黑白键 | degree = 简谱音高（上高/中中/下低）
   parsed: null,
   timeline: null,
   chordTrack: null,
@@ -629,6 +644,12 @@ const PHYSICAL_ROWS = [
 /** 返回某物理键在当前乐器下的简谱显示，未映射返回 null。 */
 function noteLabelForCode(code, instrument) {
   if (instrument.id === 'piano') {
+    if (state.keyboardLayout === 'degree') {
+      if (PIANO_HIGH[code]) return { note: `${PIANO_HIGH[code]}'`, mod: 'base' };
+      if (PIANO_MAIN[code]) return { note: String(PIANO_MAIN[code]), mod: 'base' };
+      if (PIANO_LOW[code]) return { note: `${PIANO_LOW[code]}.`, mod: 'base' };
+      return null;
+    }
     if (PIANO_MAIN[code]) return { note: String(PIANO_MAIN[code]), mod: 'base' };
     if (PIANO_SHARP[code]) return { note: `#${PIANO_SHARP[code]}`, mod: 'base' };
     if (PIANO_LOW[code]) return { note: `${PIANO_LOW[code]}.`, mod: 'base' };
@@ -647,7 +668,8 @@ function noteLabelForCode(code, instrument) {
 
 function buildKeyboardStrip() {
   const instrument = currentInstrument();
-  const rowNames = ['上排', '中排', '下排'];
+  const isDegree = instrument.id === 'piano' && state.keyboardLayout === 'degree';
+  const rowNames = isDegree ? ['高音', '中音', '低音'] : ['上排', '中排', '下排'];
   let html = '<div class="vkbd">';
 
   PHYSICAL_ROWS.forEach((codes, rowIndex) => {
@@ -661,11 +683,14 @@ function buildKeyboardStrip() {
 
   html += '</div>';
 
-  const modifierLabel = instrument.id === 'piano' ? '八度' : instrument.id === 'violin' ? '高把位' : instrument.id === 'guitar' ? '高把位' : '超吹';
-  const halfLabel = instrument.id === 'guitar' ? '高弦' : '半音';
+  const modifierLabel = instrument.id === 'piano' ? '再升八度' : instrument.id === 'violin' ? '高把位' : instrument.id === 'guitar' ? '高把位' : '超吹';
+  const halfLabel = isDegree ? '升半音#' : instrument.id === 'guitar' ? '高弦' : instrument.id === 'piano' ? '降八度' : '半音';
+  const hint = isDegree
+    ? '上排=高音 1\' · 中排=中音 1 · 下排=低音 1. · Ctrl 升半音 · 可直接点击'
+    : '上排=升音 · 中排=白键 · 下排=低音 · 可直接点击';
   html += `<div class="vkbd__mods">
     ${staticKeycap('Shift', modifierLabel)}${staticKeycap('Ctrl', halfLabel)}
-    <span class="vkbd__hint">上方数字=简谱音 · 按钮字母=键盘按键 · 可直接点击</span>
+    <span class="vkbd__hint">${hint}</span>
   </div>`;
 
   els.keyboardStrip.innerHTML = html;
@@ -799,6 +824,7 @@ function selectInstrument(id, { silent = false } = {}) {
   stage?.setInstrument(instrument.id);
   updateInstrumentUI();
   buildKeyboardStrip();
+  updateLayoutSwitchUI();
   renderPreview();
   if (wasPlaying && state.parsed) {
     beginTransport(beat);
@@ -811,6 +837,36 @@ function selectInstrument(id, { silent = false } = {}) {
     audioEngine.loadCurrentInstrument();
   }
   if (!silent) toast(`已切换到${instrument.name}。`, 'info', 1800);
+}
+
+/* ------------------------------------------------------------------ keyboard layout */
+
+function loadKeyboardLayout() {
+  const raw = safeStorageGet(LAYOUT_KEY, 'piano');
+  return raw === 'degree' ? 'degree' : 'piano';
+}
+
+function setKeyboardLayout(layout, { announce = true } = {}) {
+  const next = layout === 'degree' ? 'degree' : 'piano';
+  if (next === state.keyboardLayout) return;
+  stopAllLiveNotes();
+  state.keyboardLayout = next;
+  safeStorageSet(LAYOUT_KEY, next);
+  buildKeyboardStrip();
+  updateLayoutSwitchUI();
+  if (announce) {
+    toast(next === 'degree' ? '已切换到简谱音高布局：上排高音、中排中音、下排低音。' : '已切换到钢琴布局：上排升音、中排白键、下排低音。', 'info', 2600);
+  }
+}
+
+function updateLayoutSwitchUI() {
+  if (!els.layoutPianoBtn || !els.layoutDegreeBtn) return;
+  if (els.layoutSwitch) els.layoutSwitch.hidden = currentInstrument().id !== 'piano';
+  const isPiano = state.keyboardLayout === 'piano';
+  els.layoutPianoBtn.classList.toggle('is-on', isPiano);
+  els.layoutDegreeBtn.classList.toggle('is-on', !isPiano);
+  els.layoutPianoBtn.setAttribute('aria-pressed', String(isPiano));
+  els.layoutDegreeBtn.setAttribute('aria-pressed', String(!isPiano));
 }
 
 /* ------------------------------------------------------------------ theme */
@@ -1870,11 +1926,21 @@ function getMappingForCode(code, modifiers) {
 
   let degree = 0;
   let isHalf = false;
-  let isLowRow = false;
-  if (instrument.id === 'piano') {
+  let rowOctave = 0;
+  if (instrument.id === 'piano' && state.keyboardLayout === 'degree') {
+    // 简谱音高布局：上排=高八度、中排=中音、下排=低八度
+    if (PIANO_HIGH[code]) {
+      degree = PIANO_HIGH[code];
+      rowOctave = 1;
+    } else if (PIANO_MAIN[code]) degree = PIANO_MAIN[code];
+    else if (PIANO_LOW[code]) {
+      degree = PIANO_LOW[code];
+      rowOctave = -1;
+    }
+  } else if (instrument.id === 'piano') {
     if (PIANO_LOW[code]) {
       degree = PIANO_LOW[code];
-      isLowRow = true;
+      rowOctave = -1;
     } else if (PIANO_MAIN[code]) degree = PIANO_MAIN[code];
     else if (PIANO_SHARP[code]) {
       degree = PIANO_SHARP[code];
@@ -1885,12 +1951,17 @@ function getMappingForCode(code, modifiers) {
   }
   if (!degree) return null;
 
-  let octave = state.octaveOffset;
+  let octave = state.octaveOffset + rowOctave;
   if (instrument.id === 'piano') {
-    // 下排本身就是低八度；Shift 再升、Ctrl 再降，可叠加出更低/还原音区
-    if (isLowRow) octave -= 1;
-    if (shift) octave += 1;
-    else if (ctrl) octave -= 1;
+    if (state.keyboardLayout === 'degree') {
+      // 简谱布局：Ctrl = 升半音（#），Shift = 再升八度
+      if (shift) octave += 1;
+      else if (ctrl) isHalf = true;
+    } else {
+      // 钢琴布局：Shift 升八度、Ctrl 降八度
+      if (shift) octave += 1;
+      else if (ctrl) octave -= 1;
+    }
   } else {
     if (shift) {
       octave += 1;
@@ -2351,6 +2422,9 @@ function bindControls() {
   els.panelClose.addEventListener('click', () => toggleDrawer(false));
   els.panelBackdrop.addEventListener('click', () => toggleDrawer(false));
 
+  els.layoutPianoBtn?.addEventListener('click', () => setKeyboardLayout('piano'));
+  els.layoutDegreeBtn?.addEventListener('click', () => setKeyboardLayout('degree'));
+
   // 虚拟琴键：指针按下等同于对应物理键按下，松开则停止。
   let pointerKeyCode = null;
   els.keyboardStrip?.addEventListener('pointerdown', (event) => {
@@ -2359,7 +2433,10 @@ function bindControls() {
     event.preventDefault();
     const code = cap.dataset.code;
     const mod = cap.dataset.mod || 'base';
-    const modifiers = { shift: mod === 'shift', ctrl: false };
+    const modifiers = {
+      shift: mod === 'shift' || state.modifiers.shift,
+      ctrl: state.modifiers.ctrl,
+    };
     const mapping = getMappingForCode(code, modifiers);
     if (!mapping) return;
     if (state.liveNotes.has(code)) stopLiveNote(code);
@@ -2450,6 +2527,7 @@ function runArrangement() {
 
 function init() {
   state.theme = loadTheme();
+  state.keyboardLayout = loadKeyboardLayout();
   stage = new StageRenderer(els.stageCanvas, { clock: () => audioEngine.clock() });
   stage.setTheme(state.theme);
   stage.setInstrument(state.instrumentId);
@@ -2466,6 +2544,7 @@ function init() {
   buildInstrumentButtons();
   buildInstrumentTable();
   buildKeyboardStrip();
+  updateLayoutSwitchUI();
   applyThemeToUI();
   bindControls();
   bindThemePanelWhenReady();

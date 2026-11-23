@@ -1057,6 +1057,22 @@ kbd {
 
 /* ------------------------------------------------------------------ keyboard */
 
+.layout-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.layout-switch[hidden] {
+  display: none;
+}
+
+.layout-switch__label {
+  font-size: 10px;
+  color: var(--ink-muted);
+  margin-right: 2px;
+}
+
 .keyboard-strip {
   display: flex;
   align-items: flex-start;
