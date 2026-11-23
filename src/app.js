@@ -20,6 +20,7 @@ import {
   getInstrument,
 } from './instruments.js';
 import { arrangeScore } from './autoArranger.js';
+import { buildChordTrack } from './chords.js';
 import {
   clamp,
   copyText,
@@ -29,6 +30,7 @@ import {
   hexToRgb,
   isEditableTarget,
   midiToName,
+  nextId,
   parseRgbString,
   rgbToHex,
   safeStorageGet,
@@ -36,6 +38,7 @@ import {
 } from './tools.js';
 
 const THEME_KEY = 'floatnote.theme.v1';
+const LIBRARY_KEY = 'floatnote.library.v1';
 const DEFAULT_THEME = Object.freeze({
   color: '#a9c4ee',
   brightness: 1,
@@ -195,6 +198,14 @@ const els = {
   abStatus: document.getElementById('abStatus'),
 
   scoreInput: document.getElementById('scoreInput'),
+  songTitleInput: document.getElementById('songTitleInput'),
+  saveSongBtn: document.getElementById('saveSongBtn'),
+  libraryList: document.getElementById('libraryList'),
+  libraryCount: document.getElementById('libraryCount'),
+  chordsToggle: document.getElementById('chordsToggle'),
+  chordVolume: document.getElementById('chordVolume'),
+  chordVolumeValue: document.getElementById('chordVolumeValue'),
+  chordInfo: document.getElementById('chordInfo'),
   parseBtn: document.getElementById('parseBtn'),
   sampleBtn: document.getElementById('sampleBtn'),
   clearBtn: document.getElementById('clearBtn'),
@@ -214,6 +225,9 @@ const state = {
   instrumentId: 'piano',
   parsed: null,
   timeline: null,
+  chordTrack: null,
+  chordsEnabled: false,
+  chordVolume: 0.42,
   bpm: 84,
   currentBeat: 0,
   octaveOffset: 0,
@@ -395,71 +409,214 @@ function buildInstrumentTable() {
     </table>`;
 }
 
+/* ------------------------------------------------------------------ score library */
+
+function loadLibrary() {
+  const raw = safeStorageGet(LIBRARY_KEY, null);
+  if (!raw) return [];
+  try {
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((s) => s && typeof s.text === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLibrary(list) {
+  return safeStorageSet(LIBRARY_KEY, JSON.stringify(list));
+}
+
+/** 从简谱文本猜测曲名：优先标题注释行，否则取第一小节片段。 */
+function guessTitle(text) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    const match = line.match(/^(?:曲名|标题|title|name)\s*[:：]\s*(.+)$/i);
+    if (match) return match[1].trim().slice(0, 40);
+  }
+  const firstNoteLine = lines.find((l) => /[1-7]/.test(l) && !/^[1-7]=/.test(l));
+  if (firstNoteLine) {
+    const snippet = firstNoteLine.replace(/[|♩\d'=]/g, '').trim();
+    if (snippet) return `片段 ${snippet.slice(0, 6)}`;
+  }
+  return `未命名 ${new Date().toLocaleDateString('zh-CN')}`;
+}
+
+function currentSongStats() {
+  if (!state.parsed) return '';
+  const m = state.parsed.meta;
+  return `${m.key} 调 · ${m.timeSig} · ${state.parsed.stats.bars} 小节`;
+}
+
+function renderLibrary() {
+  if (!els.libraryList) return;
+  const list = loadLibrary();
+  els.libraryCount.textContent = String(list.length);
+  if (!list.length) {
+    els.libraryList.innerHTML =
+      '<p class="empty-state">还没有收藏。解析一份简谱后点「存入曲库」。</p>';
+    return;
+  }
+  const sorted = [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  els.libraryList.innerHTML = sorted
+    .map(
+      (song) => `<div class="library-item" data-id="${escapeHtml(song.id)}">
+        <div class="library-item__main">
+          <span class="library-item__title" data-role="title">${escapeHtml(song.title)}</span>
+          <span class="library-item__meta">${escapeHtml(song.stats || '')}</span>
+        </div>
+        <div class="library-item__actions">
+          <button class="icon-btn" data-action="load" title="载入演奏">载入</button>
+          <button class="icon-btn" data-action="rename" title="重命名">改名</button>
+          <button class="icon-btn icon-btn--danger" data-action="delete" title="删除">删除</button>
+        </div>
+      </div>`
+    )
+    .join('');
+}
+
+function addToLibrary() {
+  const text = els.scoreInput.value.trim();
+  if (!text) {
+    toast('简谱输入框是空的，没有可存的内容。', 'warn', 2600);
+    return;
+  }
+  if (!state.parsed) {
+    toast('请先点击「解析并载入」，成功后再存入曲库。', 'warn', 2800);
+    return;
+  }
+  const list = loadLibrary();
+  const title = (els.songTitleInput.value || '').trim() || guessTitle(text);
+  const now = Date.now();
+  list.push({
+    id: nextId('song'),
+    title,
+    text,
+    stats: currentSongStats(),
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (!saveLibrary(list)) {
+    toast('保存失败：浏览器存储不可用或空间已满。', 'error', 3600);
+    return;
+  }
+  els.songTitleInput.value = '';
+  renderLibrary();
+  toast(`已存入曲库：${title}`, 'ok', 2400);
+}
+
+function handleLibraryClick(event) {
+  const button = event.target.closest('button[data-action]');
+  if (!button) return;
+  const item = button.closest('.library-item');
+  if (!item) return;
+  const id = item.dataset.id;
+  const action = button.dataset.action;
+  let list = loadLibrary();
+  const index = list.findIndex((s) => s.id === id);
+  if (index < 0) return;
+
+  if (action === 'load') {
+    const song = list[index];
+    els.scoreInput.value = song.text;
+    els.songTitleInput.value = song.title;
+    loadScore(song.text);
+    toast(`已载入：${song.title}`, 'ok', 2200);
+  } else if (action === 'rename') {
+    const titleEl = item.querySelector('[data-role="title"]');
+    const current = titleEl.textContent;
+    const next = window.prompt('输入新的曲名：', current);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed) {
+      toast('曲名不能为空。', 'warn', 2200);
+      return;
+    }
+    list[index].title = trimmed;
+    list[index].updatedAt = Date.now();
+    if (!saveLibrary(list)) {
+      toast('保存失败：浏览器存储不可用。', 'error', 3000);
+      return;
+    }
+    renderLibrary();
+  } else if (action === 'delete') {
+    const confirmed = window.confirm(`确定删除「${list[index].title}」吗？此操作不可撤销。`);
+    if (!confirmed) return;
+    list.splice(index, 1);
+    saveLibrary(list);
+    renderLibrary();
+    toast('已从曲库删除。', 'info', 2000);
+  }
+}
+
 /* ------------------------------------------------------------------ keyboard hints */
 
 function keycap(code, note, mod = 'base', extraClass = '') {
-  return `<span class="keycap ${extraClass}" data-code="${code}" data-mod="${mod}" title="${escapeHtml(code)} · ${escapeHtml(note)}">
-    <span class="keycap__key">${escapeHtml(getKeyLabel(code))}</span>
+  return `<button class="keycap ${extraClass}" type="button" data-code="${code}" data-mod="${mod}" title="${escapeHtml(getKeyLabel(code))} · ${escapeHtml(note)}（可点击发声）">
     <span class="keycap__note">${escapeHtml(note)}</span>
-  </span>`;
+    <span class="keycap__key">${escapeHtml(getKeyLabel(code))}</span>
+  </button>`;
 }
 
 function staticKeycap(label, note) {
-  return `<span class="keycap" title="${escapeHtml(label)} · ${escapeHtml(note)}">
-    <span class="keycap__key">${escapeHtml(label)}</span>
+  return `<span class="keycap keycap--static" title="${escapeHtml(label)} · ${escapeHtml(note)}">
     <span class="keycap__note">${escapeHtml(note)}</span>
+    <span class="keycap__key">${escapeHtml(label)}</span>
   </span>`;
+}
+
+function emptyKeycap(code) {
+  return `<span class="keycap keycap--empty" aria-hidden="true"><span class="keycap__key">${escapeHtml(getKeyLabel(code))}</span></span>`;
+}
+
+const PHYSICAL_ROWS = [
+  ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU'],
+  ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ'],
+  ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM'],
+];
+
+/** 返回某物理键在当前乐器下的简谱显示，未映射返回 null。 */
+function noteLabelForCode(code, instrument) {
+  if (instrument.id === 'piano') {
+    if (PIANO_MAIN[code]) return { note: String(PIANO_MAIN[code]), mod: 'base' };
+    if (PIANO_SHARP[code]) return { note: `#${PIANO_SHARP[code]}`, mod: 'base' };
+    return null;
+  }
+  if (instrument.id === 'guitar') {
+    for (const row of GUITAR_ROWS) {
+      const idx = row.keys.indexOf(code);
+      if (idx >= 0) return { note: String(idx + 1), mod: row.mod };
+    }
+    return null;
+  }
+  if (LETTER_DEGREES[code]) return { note: String(LETTER_DEGREES[code]), mod: 'base' };
+  return null;
 }
 
 function buildKeyboardStrip() {
   const instrument = currentInstrument();
-  let html = '';
+  const rowNames = ['上排', '中排', '下排'];
+  let html = '<div class="vkbd">';
 
-  if (instrument.id === 'piano') {
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">主键 · 中音区</span>
-      <div class="keyboard-row">${Object.keys(PIANO_MAIN)
-        .map((code) => keycap(code, String(PIANO_MAIN[code])))
-        .join('')}</div>
-    </div>`;
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">半音</span>
-      <div class="keyboard-row">${Object.keys(PIANO_SHARP)
-        .map((code) => keycap(code, `#${PIANO_SHARP[code]}`))
-        .join('')}</div>
-    </div>`;
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">修饰</span>
-      <div class="keyboard-row">${staticKeycap('Shift', '高八度')}${staticKeycap('Ctrl', '低八度')}</div>
-    </div>`;
-  } else if (instrument.id === 'guitar') {
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">空弦 · 1 高音 E → 6 低音 E</span>
-      <div class="keyboard-row">${Object.entries(GUITAR_OPEN)
-        .map(([code, stringNumber]) => keycap(code, midiToName(GUITAR_TUNING[stringNumber - 1])))
-        .join('')}</div>
-    </div>`;
-    for (const row of GUITAR_ROWS) {
-      html += `<div class="keyboard-group">
-        <span class="keyboard-group__label">${row.string} 弦${row.mod === 'shift' ? ' · Shift' : ' · 品格'}</span>
-        <div class="keyboard-row">${row.keys
-          .map((code, index) => keycap(code, String(index + 1), row.mod))
-          .join('')}</div>
-      </div>`;
+  PHYSICAL_ROWS.forEach((codes, rowIndex) => {
+    html += `<div class="vkbd__row"><span class="vkbd__tag">${rowNames[rowIndex]}</span><div class="vkbd__keys">`;
+    for (const code of codes) {
+      const info = noteLabelForCode(code, instrument);
+      html += info ? keycap(code, info.note, info.mod) : emptyKeycap(code);
     }
-  } else {
-    const modifierLabel = instrument.id === 'violin' ? '高把位' : '超吹';
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">基础指法 · ${escapeHtml(instrument.name)}</span>
-      <div class="keyboard-row">${Object.keys(LETTER_DEGREES)
-        .map((code) => keycap(code, String(LETTER_DEGREES[code])))
-        .join('')}</div>
-    </div>`;
-    html += `<div class="keyboard-group">
-      <span class="keyboard-group__label">修饰</span>
-      <div class="keyboard-row">${staticKeycap('Shift', modifierLabel)}${staticKeycap('Ctrl', '半音')}</div>
-    </div>`;
-  }
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+
+  const modifierLabel = instrument.id === 'piano' ? '八度' : instrument.id === 'violin' ? '高把位' : instrument.id === 'guitar' ? '高把位' : '超吹';
+  const halfLabel = instrument.id === 'guitar' ? '高弦' : '半音';
+  html += `<div class="vkbd__mods">
+    ${staticKeycap('Shift', modifierLabel)}${staticKeycap('Ctrl', halfLabel)}
+    <span class="vkbd__hint">上方数字=简谱音 · 按钮字母=键盘按键 · 可直接点击</span>
+  </div>`;
 
   els.keyboardStrip.innerHTML = html;
 }
@@ -816,6 +973,10 @@ function loadScore(text, { announce = true } = {}) {
   stopAllLiveNotes();
   state.parsed = result;
   state.timeline = buildTimeline(result.notes);
+  state.chordTrack = buildChordTrack(result, state.timeline);
+  if (els.chordInfo && state.chordsEnabled && state.chordTrack?.events?.length) {
+    els.chordInfo.textContent = `已为 ${state.chordTrack.barCount} 小节生成和弦：${state.chordTrack.chords.slice(0, 8).join(' · ')}${state.chordTrack.chords.length > 8 ? ' …' : ''}`;
+  }
   state.currentBeat = 0;
   state.bpm = clamp(Number(result.meta.bpm) || 80, 20, 300);
   state.ab = { a: null, b: null };
@@ -872,6 +1033,7 @@ function clearScore() {
   stopAllLiveNotes();
   state.parsed = null;
   state.timeline = null;
+  state.chordTrack = null;
   state.currentBeat = 0;
   state.ab = { a: null, b: null };
   state.loopMode = 'off';
@@ -1106,12 +1268,21 @@ function makeSegment(startBeat, endBeat, startTime) {
   ) {
     pointer += 1;
   }
+  const chordEvents = state.chordTrack?.events || [];
+  let chordPointer = 0;
+  while (
+    chordPointer < chordEvents.length &&
+    chordEvents[chordPointer].startBeat + chordEvents[chordPointer].durationBeats <= startBeat
+  ) {
+    chordPointer += 1;
+  }
   return {
     id: ++transport.segmentSeed,
     startBeat,
     endBeat,
     startTime,
     pointer,
+    chordPointer,
     nextClickBeat: Math.ceil(startBeat - 1e-9),
   };
 }
@@ -1327,6 +1498,41 @@ function scheduleSegment(segment, horizon) {
       }
     }
     segment.pointer += 1;
+  }
+
+  if (state.chordsEnabled && state.chordTrack?.events?.length) {
+    const chordEvents = state.chordTrack.events;
+    while (segment.chordPointer < chordEvents.length) {
+      const chord = chordEvents[segment.chordPointer];
+      if (chord.startBeat >= segment.endBeat) break;
+      const chordEnd = chord.startBeat + chord.durationBeats;
+      if (chordEnd <= segment.startBeat) {
+        segment.chordPointer += 1;
+        continue;
+      }
+      const effStart = Math.max(chord.startBeat, segment.startBeat);
+      const when = segment.startTime + (effStart - segment.startBeat) / transport.bps;
+      if (when > horizon) break;
+      const durBeats = Math.min(segment.endBeat, chordEnd) - effStart;
+      if (durBeats > 0) {
+        const seconds = durBeats / transport.bps;
+        const velocity = state.chordVolume;
+        audioEngine.playChordTone(chord.bassMidi, {
+          when,
+          duration: Math.min(seconds, transport.bps * 1.6),
+          velocity: velocity * 0.9,
+          bass: true,
+        });
+        chord.chordMidis.forEach((midi, idx) => {
+          audioEngine.playChordTone(midi, {
+            when: when + idx * 0.012,
+            duration: seconds,
+            velocity: velocity * 0.55,
+          });
+        });
+      }
+      segment.chordPointer += 1;
+    }
   }
 
   while (segment.nextClickBeat < segment.endBeat) {
@@ -1975,6 +2181,34 @@ function bindControls() {
     toast(`键盘基准八度：${state.octaveOffset > 0 ? '+' : ''}${state.octaveOffset}`, 'info', 1600);
   });
 
+  els.chordsToggle?.addEventListener('click', () => {
+    const enabled = els.chordsToggle.getAttribute('aria-pressed') !== 'true';
+    els.chordsToggle.setAttribute('aria-pressed', String(enabled));
+    els.chordsToggle.classList.toggle('is-on', enabled);
+    els.chordsToggle.textContent = enabled ? '开' : '关';
+    state.chordsEnabled = enabled;
+    audioEngine.setChordEnabled(enabled);
+    if (enabled) {
+      const info = state.chordTrack?.events?.length
+        ? `已为 ${state.chordTrack.barCount} 小节生成和弦：${state.chordTrack.chords.slice(0, 8).join(' · ')}${state.chordTrack.chords.length > 8 ? ' …' : ''}`
+        : '载入乐谱后会自动按小节配和弦。';
+      if (els.chordInfo) els.chordInfo.textContent = info;
+      toast('和弦伴奏已开启，重新播放即可听到效果。', 'ok', 2600);
+    } else {
+      if (els.chordInfo) els.chordInfo.textContent = '开启后按小节自动配三和弦与低音，与旋律同时播放。';
+    }
+  });
+
+  els.chordVolume?.addEventListener('input', (event) => {
+    const value = Number(event.target.value);
+    state.chordVolume = value / 100;
+    els.chordVolumeValue.textContent = `${value}%`;
+    audioEngine.setChordVolume(state.chordVolume);
+  });
+
+  els.saveSongBtn?.addEventListener('click', addToLibrary);
+  els.libraryList?.addEventListener('click', handleLibraryClick);
+
   els.parseBtn.addEventListener('click', () => loadScore(els.scoreInput.value));
   els.sampleBtn.addEventListener('click', () => {
     els.scoreInput.value = DEFAULT_SCORE;
@@ -2047,6 +2281,32 @@ function bindControls() {
   els.panelToggle.addEventListener('click', () => toggleDrawer(true));
   els.panelClose.addEventListener('click', () => toggleDrawer(false));
   els.panelBackdrop.addEventListener('click', () => toggleDrawer(false));
+
+  // 虚拟琴键：指针按下等同于对应物理键按下，松开则停止。
+  let pointerKeyCode = null;
+  els.keyboardStrip?.addEventListener('pointerdown', (event) => {
+    const cap = event.target.closest('.keycap[data-code]');
+    if (!cap || cap.classList.contains('keycap--empty')) return;
+    event.preventDefault();
+    const code = cap.dataset.code;
+    const mod = cap.dataset.mod || 'base';
+    const modifiers = { shift: mod === 'shift', ctrl: false };
+    const mapping = getMappingForCode(code, modifiers);
+    if (!mapping) return;
+    if (state.liveNotes.has(code)) stopLiveNote(code);
+    pointerKeyCode = code;
+    try { cap.setPointerCapture(event.pointerId); } catch { /* noop */ }
+    state.heldCodes.add(code);
+    void startLiveNote(code, mapping);
+  });
+  const releasePointerKey = () => {
+    if (pointerKeyCode && (state.liveNotes.has(pointerKeyCode) || state.heldCodes.has(pointerKeyCode))) {
+      stopLiveNote(pointerKeyCode);
+    }
+    pointerKeyCode = null;
+  };
+  els.keyboardStrip?.addEventListener('pointerup', releasePointerKey);
+  els.keyboardStrip?.addEventListener('pointercancel', releasePointerKey);
 
   window.addEventListener('keydown', handleKeyDown, { passive: false });
   window.addEventListener('keyup', handleKeyUp, { passive: false });
@@ -2131,6 +2391,8 @@ function init() {
   audioEngine.setInstrumentVolume(Number(els.instrumentVolume.value) / 100);
   audioEngine.setReverbMix(Number(els.reverbMix.value) / 100);
   audioEngine.setReverbEnabled(true);
+  audioEngine.setChordVolume(state.chordVolume);
+  audioEngine.setChordEnabled(state.chordsEnabled);
 
   buildInstrumentButtons();
   buildInstrumentTable();
@@ -2138,6 +2400,7 @@ function init() {
   applyThemeToUI();
   bindControls();
   bindThemePanelWhenReady();
+  renderLibrary();
 
   els.reverbPreset.value = currentInstrument().reverb;
   els.scoreInput.value = DEFAULT_SCORE;

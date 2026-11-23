@@ -1139,6 +1139,170 @@ kbd {
   opacity: 0.36;
 }
 
+/* 三行虚拟琴键 */
+.vkbd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vkbd__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vkbd__row:nth-child(2) .vkbd__keys {
+  padding-left: 18px;
+}
+
+.vkbd__row:nth-child(3) .vkbd__keys {
+  padding-left: 36px;
+}
+
+.vkbd__tag {
+  flex-shrink: 0;
+  width: 24px;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+.vkbd__keys {
+  display: flex;
+  gap: 5px;
+}
+
+button.keycap {
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.keycap:active,
+button.keycap.is-held {
+  transform: translateY(1px);
+}
+
+.keycap--static {
+  cursor: default;
+}
+
+.keycap--empty {
+  opacity: 0.22;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+  cursor: default;
+}
+
+.keycap--empty .keycap__key {
+  color: var(--ink-faint);
+}
+
+.vkbd__mods {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.7);
+}
+
+.vkbd__hint {
+  margin-left: 8px;
+  font-size: 9px;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+/* 和弦控制 */
+.chord-control {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.chord-control__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.chord-control .fine-print {
+  margin: 8px 0 0;
+}
+
+/* 曲库 */
+.library-save-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.library-save-row .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.library-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.library-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.library-item__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-item__meta {
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
+.library-item__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.library-item__actions .icon-btn {
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
+.icon-btn--danger {
+  color: #c0563f;
+}
+
 /* ------------------------------------------------------------------ transport */
 
 .transport {
@@ -2067,9 +2231,21 @@ body.drawer-open {
     border-radius: 24px;
   }
 
-  .stage-hint,
-  .keyboard-strip {
+  .stage-hint {
     display: none;
+  }
+
+  .keyboard-strip {
+    padding: 8px;
+  }
+
+  .vkbd__tag {
+    display: none;
+  }
+
+  .keycap {
+    min-width: 30px;
+    height: 40px;
   }
 
   .stage-note {

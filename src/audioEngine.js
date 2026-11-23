@@ -86,6 +86,8 @@ export class AudioEngine {
     this.reverbEnabled = true;
     this.reverbMix = 0.3;
     this.reverbPreset = 'long';
+    this.chordEnabled = false;
+    this.chordVolume = 0.42;
     this.node = {};
     this.noiseBuffer = null;
     this.impulseCache = new Map();
@@ -170,15 +172,19 @@ export class AudioEngine {
     const wet = ctx.createGain();
     wet.gain.value = this.reverbEnabled ? this.reverbMix : 0;
 
+    const chordBus = ctx.createGain();
+    chordBus.gain.value = this.chordVolume;
+
     instrument.connect(dry);
     dry.connect(master);
     instrument.connect(convolver);
     convolver.connect(wet);
     wet.connect(master);
+    chordBus.connect(master);
     master.connect(limiter);
     limiter.connect(ctx.destination);
 
-    this.node = { master, limiter, instrument, dry, convolver, wet };
+    this.node = { master, limiter, instrument, chordBus, dry, convolver, wet };
     this.setReverbPreset(this.reverbPreset);
   }
 
@@ -573,7 +579,7 @@ export class AudioEngine {
     };
   }
 
-  createSynthVoice(midi, when, duration, velocity, config) {
+  createSynthVoice(midi, when, duration, velocity, config, destination = null) {
     const ctx = this.ctx;
     const synth = config.synth;
     const noteGain = ctx.createGain();
@@ -597,7 +603,7 @@ export class AudioEngine {
     const hold = duration === null ? Number.POSITIVE_INFINITY : duration;
     applyEnvelope(noteGain.gain, when, peak, adsr, hold);
     filter.connect(noteGain);
-    noteGain.connect(this.node.instrument);
+    noteGain.connect(destination || this.node.instrument);
 
     const oscillators = [];
     const gains = [];
@@ -733,6 +739,73 @@ export class AudioEngine {
         stopAt(at, 0.04);
       },
     };
+  }
+
+  /* -------------------------------------------------- chord accompaniment */
+
+  setChordEnabled(enabled) {
+    this.chordEnabled = Boolean(enabled);
+  }
+
+  setChordVolume(value) {
+    this.chordVolume = clamp(Number(value) || 0, 0, 1);
+    if (this.node?.chordBus) {
+      this.node.chordBus.gain.setTargetAtTime(this.chordVolume, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  /**
+   * 播放一个和弦音（低音或和弦内音），走独立总线，音量轻、attack 柔和。
+   */
+  playChordTone(midi, { when, duration, velocity = 0.5, bass = false } = {}) {
+    if (!isRunning(this.ctx) || !this.node?.chordBus) return null;
+    const note = Math.round(Number(midi));
+    if (!Number.isFinite(note) || note < 0 || note > 127) return null;
+
+    const now = this.ctx.currentTime;
+    const start = Math.max(Number(when) || now, now);
+    const hold = Number.isFinite(duration) ? Math.max(0.08, duration) : 1.2;
+
+    const config = {
+      family: 'keyboard',
+      adsr: {
+        attack: bass ? 0.02 : 0.06,
+        decay: bass ? 0.3 : 0.5,
+        sustain: bass ? 0.5 : 0.42,
+        release: bass ? 0.5 : 0.9,
+      },
+      synth: {
+        partials: bass
+          ? [
+              { type: 'triangle', ratio: 1, gain: 0.95, detune: 0 },
+              { type: 'sine', ratio: 2, gain: 0.18, detune: 0 },
+            ]
+          : [
+              { type: 'sine', ratio: 1, gain: 0.7, detune: -3 },
+              { type: 'sine', ratio: 1, gain: 0.7, detune: 3 },
+              { type: 'triangle', ratio: 2, gain: 0.14, detune: 0 },
+            ],
+        filter: { type: 'lowpass', frequency: bass ? 1400 : 2400, q: 0.6, envAmount: 400, envDecay: 0.3 },
+      },
+    };
+
+    const voice = this.createSynthVoice(note, start, hold, velocity, config, this.node.chordBus);
+    if (!voice) return null;
+    voice.id = nextId('chord');
+    voice.source = 'chord';
+    voice.startedAt = start;
+    voice.ended = false;
+    voice.cleanup = () => {
+      if (voice.ended) return;
+      voice.ended = true;
+      this.voices.delete(voice);
+    };
+    const primary = voice.primaryOsc;
+    if (primary) {
+      primary.addEventListener('ended', () => voice.cleanup(), { once: true });
+    }
+    this.voices.add(voice);
+    return voice;
   }
 
   stopAll({ immediate = false } = {}) {

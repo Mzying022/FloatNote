@@ -10,3 +10,7 @@ Thumbs.db
 # 依赖 / 临时文件（本项目为纯静态，通常不会出现）
 node_modules/
 *.log
+
+# 本地测试残留
+_test_profile/
+_test*.js

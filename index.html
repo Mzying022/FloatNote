@@ -114,6 +114,18 @@
           </label>
         </div>
 
+        <div class="chord-control">
+          <div class="chord-control__head">
+            <span class="control-row__label">和弦伴奏</span>
+            <button class="ghost-btn ghost-btn--small" id="chordsToggle" type="button" aria-pressed="false">关</button>
+          </div>
+          <label class="control-row" for="chordVolume">
+            <span class="control-row__label">伴奏音量 <output id="chordVolumeValue">42%</output></span>
+            <input class="range-input" id="chordVolume" type="range" min="0" max="100" step="1" value="42">
+          </label>
+          <p class="fine-print" id="chordInfo">开启后按小节自动配三和弦与低音，与旋律同时播放。</p>
+        </div>
+
         <div class="octave-control">
           <span class="control-row__label">键盘基准八度</span>
           <div class="segmented" id="octaveSelector" role="group" aria-label="键盘基准八度">
@@ -284,6 +296,22 @@
             <p class="fine-print">暂不支持装饰音、滑音、强弱记号、反复记号、图片 OCR 与五线谱。</p>
           </div>
         </details>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>我的曲库</h2>
+          <span class="section-note">收藏 <span id="libraryCount">0</span> 首 · 存在本机</span>
+        </div>
+        <div class="library-save-row">
+          <label class="sr-only" for="songTitleInput">曲名</label>
+          <input class="text-input" id="songTitleInput" type="text" placeholder="曲名（留空自动识别）" maxlength="40" autocomplete="off">
+          <button class="ghost-btn ghost-btn--small ghost-btn--primary" id="saveSongBtn" type="button">存入曲库</button>
+        </div>
+        <div class="library-list" id="libraryList">
+          <p class="empty-state">还没有收藏。解析一份简谱后点「存入曲库」。</p>
+        </div>
+        <p class="fine-print">曲谱保存在此浏览器的本地存储中，换浏览器或清理缓存会丢失，请另行备份。</p>
       </section>
 
       <section class="panel-section">
