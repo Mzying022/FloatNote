@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="关于 FloatNote：纯静态多乐器简谱演奏器的设计、光影原理、结构、使用方式与开源许可。">
+  <meta name="theme-color" content="#f4f2f8">
+  <title>关于 FloatNote · 让简谱浮起来</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2387cefa'/%3E%3Cstop offset='1' stop-color='%23b19cd9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='%23f8f6fb'/%3E%3Cpath d='M40 14v26a8 8 0 1 1-4-7V22l-14 4v-6l14-4z' fill='url(%23g)'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles/global.css">
+  <link rel="stylesheet" href="styles/button.css">
+  <link rel="stylesheet" href="styles/theme.css">
+  <link rel="stylesheet" href="styles/pages.css">
+</head>
+<body class="subpage">
+  <div class="page-atmosphere" aria-hidden="true">
+    <span class="atmosphere-orb atmosphere-orb--one"></span>
+    <span class="atmosphere-orb atmosphere-orb--two"></span>
+    <span class="atmosphere-orb atmosphere-orb--three"></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="./index.html" aria-label="FloatNote 首页">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" role="presentation">
+          <path d="M25.5 6.5v20.2a6.3 6.3 0 1 1-3.2-5.5V11.9l-10.4 3v-4.6l13.6-3.8z"></path>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <strong>FloatNote</strong>
+        <small>让简谱浮起来</small>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="站点导航">
+      <a class="nav-link" href="./index.html">演奏台</a>
+      <a class="nav-link is-active" href="./about.html" aria-current="page">关于</a>
+      <a class="nav-link" href="./about.html#license">开源说明</a>
+      <a class="ghost-btn ghost-btn--small" href="./index.html">开始演奏</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="page-hero">
+      <div class="page-hero__copy">
+        <span class="eyebrow">About FloatNote</span>
+        <h1>把简谱，放进一束<br>会呼吸的光里。</h1>
+        <p class="page-hero__lead">
+          FloatNote 是一个个人自娱向的开源实验：用一张网页，把文本简谱变成五种乐器的声音，
+          再用 Canvas 2D 把每一个音画成一束柔光。没有后端，没有构建，没有账号，也没有需要上传的乐谱。
+        </p>
+        <div class="page-chip-row">
+          <span class="chip">纯静态 HTML</span>
+          <span class="chip">ES Modules</span>
+          <span class="chip">Canvas 2D</span>
+          <span class="chip">WebAudio</span>
+          <span class="chip">MIT</span>
+        </div>
+        <div class="page-actions">
+          <a class="ghost-btn ghost-btn--primary" href="./index.html">返回演奏台</a>
+          <a class="ghost-btn" href="#notation">查看简谱规范</a>
+        </div>
+      </div>
+      <div class="page-hero__visual">
+        <canvas class="ambient-canvas" id="aboutCanvas" aria-label="柔光与烟雾的粒子动画"></canvas>
+        <div class="visual-caption">
+          <strong>screen · radial gradient</strong>
+          <span>粒子对象池 · 渲染时钟绑定音频</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-grid" aria-label="项目概览">
+      <article class="about-card">
+        <span class="eyebrow">01 · Position</span>
+        <h2>它是什么，不是什么</h2>
+        <p>
+          FloatNote 是一个<strong>纯静态音乐交互网页</strong>。官方只要求你把它放到任意静态 HTTP 服务上，
+          就能浏览、搜谱、解析简谱、播放声音。它不提供图片 OCR，不做爬虫，也不托管你的乐谱。
+        </p>
+        <p>
+          它适合个人练习、听旋律、试验不同乐器的音色和光效。它不是专业制谱软件，也不试图替代完整 DAW。
+          所有简谱文本只留在当前浏览器里，搜索由你自己在新标签页完成。
+        </p>
+        <h3>硬性约束</h3>
+        <ul>
+          <li>原生 HTML5 + CSS3 + ES Modules，无前端框架、无打包工具、无后端服务。</li>
+          <li>Canvas 2D 渲染；WebAudio API + WebAudioFont 本地采样音色。</li>
+          <li>jQuery CDN 只用于主题调色面板，演奏、解析、渲染核心完全不依赖 jQuery。</li>
+          <li>桌面端完整 QWERTY 演奏；移动端保留浏览、搜谱、播放，不提供触屏虚拟键盘。</li>
+        </ul>
+      </article>
+
+      <article class="about-card">
+        <span class="eyebrow">02 · Light</span>
+        <h2>光为什么看起来在呼吸</h2>
+        <p>
+          舞台上没有一张位图素材。所有光都用 <strong>Canvas 2D 径向渐变与线性渐变</strong>绘制，
+          并固定使用 <code>globalCompositeOperation = 'screen'</code> 做滤色叠加。光与光相遇时只会变亮，
+          不会出现生硬的边界。
+        </p>
+        <p>
+          粒子不是每帧新建的对象，而是从预分配的对象池里借出、归还、复用。
+          这样长音、快速跑句和反复循环都不会持续制造垃圾对象，画面也不容易在演奏高潮时掉帧。
+        </p>
+        <h3>五种光效</h3>
+        <p>
+          钢琴的垂直光柱随音高变细变亮；吉他的擦弦拖尾随低音拉长；小提琴的指板流光在高把位更密；
+          萨克斯的锥形气流随时值衰减；笛子的指孔向两侧迸发短促光点。乐器切换时，光的形态也一起切换。
+        </p>
+      </article>
+
+      <article class="about-card about-card--wide">
+        <span class="eyebrow">03 · Sync</span>
+        <h2>声画同步：让眼睛相信耳朵</h2>
+        <p>
+          播放调度统一使用 <code>AudioContext.currentTime</code>：每个音符、每个节拍器点击都被换算成精确的
+          音频时间点，再提前排入 WebAudio 时间线。Canvas 的渲染循环也读取同一个音频时钟，
+          粒子的产生、乐器的光柱、节拍光标与小节进度因此共享一套时间，而不是各跑各的
+          <code>performance.now()</code>。
+        </p>
+        <div class="principle-grid">
+          <div class="principle">
+            <span class="principle__index">A</span>
+            <h3>提前 0.42 秒排程</h3>
+            <p>用短间隔调度器把即将到来的音符写入音频时间线，避免主线程抖动造成的节奏毛刺。</p>
+          </div>
+          <div class="principle">
+            <span class="principle__index">B</span>
+            <h3>段循环与 A–B</h3>
+            <p>整曲循环与 A–B 循环通过循环段调度实现，声音与画面在边界处共同回卷。</p>
+          </div>
+          <div class="principle">
+            <span class="principle__index">C</span>
+            <h3>逐音包络</h3>
+            <p>采样音色与内置合成兜底共用统一的 ADSR、音量与长/短混响总线。</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="about-section" id="lights">
+      <div class="section-heading">
+        <h2>五束光，五种性格</h2>
+        <span class="section-note">音色、光效与演奏手感是一起设计的</span>
+      </div>
+      <div class="light-grid">
+        <article class="light-card" style="--light-color:#9db9e8">
+          <span class="light-card__swatch" aria-hidden="true"></span>
+          <h3>钢琴</h3>
+          <p>按键触发垂直光柱，粒子从键面向上扩散。音越高，光柱越细、越亮。</p>
+          <span class="light-card__hint">88 keys · long reverb</span>
+        </article>
+        <article class="light-card" style="--light-color:#e3b7a8">
+          <span class="light-card__swatch" aria-hidden="true"></span>
+          <h3>吉他</h3>
+          <p>水平琴弦滑动光效，品格按压处生成横向擦弦拖尾。低音拖尾更长、更柔和。</p>
+          <span class="light-card__hint">6 strings · short reverb</span>
+        </article>
+        <article class="light-card" style="--light-color:#c5a9dd">
+          <span class="light-card__swatch" aria-hidden="true"></span>
+          <h3>小提琴</h3>
+          <p>指板纵向流光滑动。高把位的粒子密度更高，长音会持续呼吸。</p>
+          <span class="light-card__hint">4 strings · long reverb</span>
+        </article>
+        <article class="light-card" style="--light-color:#e4b8c4">
+          <span class="light-card__swatch" aria-hidden="true"></span>
+          <h3>萨克斯</h3>
+          <p>吹口向前的锥形气流，随音符时值逐渐衰减。按键孔会跟着音高亮起。</p>
+          <span class="light-card__hint">alto sax · short reverb</span>
+        </article>
+        <article class="light-card" style="--light-color:#a9d6c9">
+          <span class="light-card__swatch" aria-hidden="true"></span>
+          <h3>笛子</h3>
+          <p>指孔双侧短促迸发光点。高音区明度更高、迸发速度更快，气息感更轻。</p>
+          <span class="light-card__hint">C4 – C7 · short reverb</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="about-section" id="instruments">
+      <div class="section-heading">
+        <h2>乐器搭配科普</h2>
+        <span class="section-note">智能编配推荐的依据</span>
+      </div>
+      <div class="about-grid">
+        <article class="about-card">
+          <p>
+            编配不是玄学，至少在这个项目里不是。规则会先读乐谱的<strong>音域跨度、节奏密度、速度与五声性</strong>，
+            给出古典、民乐、通俗三种流派倾向；再按每种乐器的音域、音色家族与流派契合度排序主奏。
+          </p>
+          <div class="pairing-list">
+            <div class="pairing-item">
+              <strong>键盘 × 弦乐</strong>
+              <span>钢琴颗粒清晰、和声完整；小提琴线条连贯。一个负责骨架，一个负责呼吸，是最稳的主奏组合之一。</span>
+            </div>
+            <div class="pairing-item">
+              <strong>气鸣 × 拨弦</strong>
+              <span>笛子与吉他的瞬态差异很大：一个靠气息，一个靠拨弦。音色区分度高，适合民乐或轻快的通俗旋律。</span>
+            </div>
+            <div class="pairing-item">
+              <strong>簧管 × 键盘</strong>
+              <span>萨克斯的沙哑中频与钢琴的明亮高频互补。萨克斯做主奏时，键盘适合铺和声或提供节奏骨架。</span>
+            </div>
+            <div class="pairing-item">
+              <strong>同族叠加要克制</strong>
+              <span>两支气鸣乐器或两支弓弦乐器同时出现时，频段容易挤在一起；此时更需要用音区、音量和混响拉开距离。</span>
+            </div>
+          </div>
+        </article>
+        <article class="about-card prose">
+          <h3>混响不是越多越好</h3>
+          <p>
+            钢琴与小提琴默认长混响，让尾音在空间里自然扩散；吉他、萨克斯、笛子默认短混响，
+            保持颗粒与节奏轮廓。你可以在控制面板里关闭混响、调整湿度，或直接应用编配建议。
+          </p>
+          <h3>音量与动态</h3>
+          <p>
+            总音量、乐器音量与混响湿度是三条独立的线。总音量控制整体出口；乐器音量控制当前音色的存在感；
+            混响湿度只控制送进混响空间的比例。所有音符共享同一套 ADSR 包络参数，
+            但音符力度与音高会改变光效的大小与亮度。
+          </p>
+          <h3>越界音符</h3>
+          <p>
+            每种乐器有独立音域。超出音域的音符会自动移八度适配，并在乐谱预览中标记；
+            如果移八度后仍无法落进音域，该音符保持静音，不会中断整首播放。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="about-section" id="controls">
+      <div class="section-heading">
+        <h2>怎么演奏</h2>
+        <span class="section-note">标准 QWERTY · 桌面端完整演奏</span>
+      </div>
+      <div class="about-grid">
+        <article class="about-card prose">
+          <p>
+            五套键位共用同一套简谱语义（1–7、高低音、八度、延音），但每个乐器的物理键位独立分配。
+            同一个按键在不同乐器上可以代表不同简谱音级；具体映射始终显示在舞台下方的键位提示条里。
+          </p>
+          <table class="notation-table">
+            <thead>
+              <tr><th>乐器</th><th>主键位</th><th>修饰键 / 音域</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>钢琴</td><td>A S D F G H J = 1–7</td><td>W E T Y U = #1 #2 #4 #5 #6；Shift 高八度，Ctrl 低八度</td></tr>
+              <tr><td>吉他</td><td>1–6 = 六根空弦；QWERTY / ASDFGH / ZXCVBN = 前三弦品格</td><td>Shift + 字母 = 4–6 弦品格；长按延音，换品重触发</td></tr>
+              <tr><td>小提琴</td><td>A–J = 低把位 1–7</td><td>Shift = 高把位；Ctrl = 半音</td></tr>
+              <tr><td>萨克斯</td><td>A–J = 基础指法 1–7</td><td>Shift = 超吹；Ctrl = 半音</td></tr>
+              <tr><td>笛子</td><td>A–J = 基础指法 1–7</td><td>Shift = 超吹；Ctrl = 半音</td></tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="about-card prose">
+          <h3>长按与修饰键</h3>
+          <p>
+            按住任意映射键就会持续发声；超过 380 毫秒后，舞台会把它标记为“延音”。
+            在按住期间切换 Shift / Ctrl，当前音会立即切换八度、把位或半音，而不会中断。
+            多个修饰键同时按下时，优先级是：超吹 &gt; 八度 / 把位 &gt; 半音。
+          </p>
+          <h3>全局快捷键</h3>
+          <ul>
+            <li><code>Space</code>：播放 / 暂停（焦点不在输入框或按钮上时）。</li>
+            <li><code>Esc</code>：停止所有正在发声的键与播放。</li>
+            <li><code>Ctrl / Cmd + Enter</code>：在简谱输入框中解析并载入。</li>
+          </ul>
+          <h3>浏览器冲突</h3>
+          <p>
+            部分组合（例如 Ctrl + W）会被浏览器优先处理，网页无法完全拦截。遇到这类情况，
+            请使用控制面板里的“键盘基准八度”按钮整体移八度，或改用上方的界面控件。
+          </p>
+          <h3>移动端</h3>
+          <p>
+            移动端不提供触屏虚拟键盘。你仍然可以浏览界面、搜索简谱、粘贴解析、播放、调速、循环与标记 A–B；
+            键盘演奏提示会自动隐藏。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="about-section" id="notation">
+      <div class="section-heading">
+        <h2>文本简谱规范</h2>
+        <span class="section-note">能被这个解析器读懂的写法</span>
+      </div>
+      <div class="about-grid">
+        <article class="about-card prose">
+          <p>开头可以写一行声明；不写时默认 C 调、4/4 拍、80 BPM。</p>
+          <div class="notation-block">1=C 4/4 ♩=80
+5 3 5 | 6 5 3 | 2 3 5 1' | 1' - |</div>
+          <table class="notation-table">
+            <thead><tr><th>写法</th><th>含义</th></tr></thead>
+            <tbody>
+              <tr><td>1=C / 1=G / 1=F</td><td>调号；支持常见的升号、降号调名</td></tr>
+              <tr><td>4/4 / 3/4 / 2/4</td><td>拍号；也接受 6/8 等分母为 2、4、8、16 的拍号</td></tr>
+              <tr><td>♩=80 / BPM=80</td><td>速度，范围 20–300 BPM</td></tr>
+              <tr><td>1 2 3 4 5 6 7</td><td>基础音级，默认四分音符</td></tr>
+              <tr><td>1. / 1'</td><td>低八度 / 高八度，可叠加</td></tr>
+              <tr><td>#1</td><td>升半音</td></tr>
+              <tr><td>1_</td><td>八分音符；多个下划线继续减半</td></tr>
+              <tr><td>1-</td><td>二分音符；单独的 - 延长前一拍</td></tr>
+              <tr><td>1~</td><td>连音线；与同音高的下一个音合并时值</td></tr>
+              <tr><td>|</td><td>小节线</td></tr>
+              <tr><td>0</td><td>休止符（兼容扩展，不是原始规范的一部分）</td></tr>
+            </tbody>
+          </table>
+        </article>
+        <article class="about-card prose">
+          <h3>解析器会做什么</h3>
+          <p>
+            先清洗文本、识别首行声明，再按小节线和小节内的空格拆分音符，逐个读取音级、八度、半音、时值、连音线与小节编号，
+            最后输出标准化的音符数组。解析错误会带行号、列号与原因；小节拍数与拍号不一致时会给出提示，但不会阻止播放。
+          </p>
+          <h3>暂不支持</h3>
+          <ul>
+            <li>装饰音、滑音、强弱记号、反复记号、房子记号。</li>
+            <li>图片、PDF、图片 OCR、五线谱。</li>
+            <li>降号写法（遇到时请改成等音升号，例如 b2 写成 #1）。</li>
+            <li>多声部、和弦同时发声、歌词对齐。</li>
+          </ul>
+          <h3>AI 辅助转换</h3>
+          <p>
+            演奏台右侧有一个“复制格式给AI”按钮。它复制一份格式说明，你可以发给任意 AI，
+            让 AI 把歌曲或其它格式的简谱转换成本软件支持的纯文本乐谱，再粘贴回输入框解析。
+            建议明确告诉 AI：只输出乐谱，不要解释、不要 Markdown。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="about-section" id="license">
+      <div class="section-heading">
+        <h2>开源与第三方许可</h2>
+        <span class="section-note">代码、音色与工具各自的版权</span>
+      </div>
+      <div class="about-card prose">
+        <p>
+          FloatNote 的自有代码以 <strong>MIT License</strong> 发布。你可以自由使用、修改、再分发，
+          也欢迎把它改成自己的乐器或光效实验。仓库中的第三方组件与音色数据保留其原始许可。
+        </p>
+        <div class="license-list">
+          <div class="license-item">
+            <strong>FloatNote 自有代码</strong>
+            <p>MIT License。完整文本见仓库根目录的 <a href="./LICENSE">LICENSE</a>。</p>
+          </div>
+          <div class="license-item">
+            <strong>WebAudioFontPlayer.js</strong>
+            <p>
+              采样合成播放器，作者 Sergey Surikov，<strong>GNU GPL-3.0</strong>。
+              源码与许可：<a href="https://github.com/surikov/webaudiofont" target="_blank" rel="noopener noreferrer">github.com/surikov/webaudiofont</a>。
+              它位于 <code>vendor/WebAudioFontPlayer.js</code>，与 FloatNote 自有代码分开存放。
+            </p>
+          </div>
+          <div class="license-item">
+            <strong>FluidR3 GM 音色</strong>
+            <p>
+              原始 FluidR3 SoundFont 由 Frank Wen 以 MIT License 发布。
+              本项目的钢琴、吉他、小提琴、中音萨克斯、长笛采样来自 FluidR3 GM 的 WebAudioFont 转换版本，
+              许可说明：<a href="https://github.com/musescore/MuseScore/blob/main/share/sound/FluidR3Mono_License.md" target="_blank" rel="noopener noreferrer">FluidR3Mono License</a>。
+            </p>
+          </div>
+          <div class="license-item">
+            <strong>jQuery</strong>
+            <p>
+              OpenJS Foundation 维护，MIT License。页面仅从 CDN 加载它来驱动主题调色面板；
+              核心演奏、解析和 Canvas 渲染不依赖 jQuery。来源：<a href="https://jquery.com/" target="_blank" rel="noopener noreferrer">jquery.com</a>。
+            </p>
+          </div>
+        </div>
+        <p class="license-note">
+          注意：WebAudioFontPlayer.js 使用 GPL-3.0，而 FloatNote 自有代码使用 MIT。
+          两者在同一仓库中分开存放。若你计划把包含 WebAudioFont 的整站作为单一作品再分发，
+          请自行确认 GPL-3.0 与本项目其余部分的兼容性，并保留所有版权与许可声明。
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>FloatNote</strong>
+      <span>柔光、烟雾与五种乐器，在同一页里轻声呼吸。</span>
+    </div>
+    <div class="site-footer__links">
+      <a href="./index.html">演奏台</a>
+      <a href="#notation">简谱规范</a>
+      <a href="#license">MIT 与第三方许可</a>
+      <span>纯静态 · 无后端 · 无构建</span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { startAmbient } from './src/pageAmbient.js';
+    startAmbient(document.getElementById('aboutCanvas'), { color: '#a9c4ee' });
+  </script>
+</body>
+</html>

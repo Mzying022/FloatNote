@@ -1,0 +1,207 @@
+/* FloatNote · 自研幽灵按钮组件 */
+
+.ghost-btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  min-height: 38px;
+  padding: 0 17px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 0.24s var(--ease-soft),
+    box-shadow 0.24s var(--ease-soft),
+    color 0.24s var(--ease-soft),
+    transform 0.18s var(--ease-soft),
+    filter 0.18s var(--ease-soft);
+}
+
+.ghost-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--ghost-stroke);
+  opacity: 0.68;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  transition: opacity 0.24s var(--ease-soft);
+}
+
+.ghost-btn:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 0 18px rgba(135, 206, 250, 0.26),
+    0 8px 22px rgba(91, 112, 151, 0.08);
+  filter: brightness(1.06);
+}
+
+.ghost-btn:hover::before {
+  opacity: 1;
+}
+
+.ghost-btn:active {
+  transform: translateY(1px) scale(0.99);
+  filter: brightness(0.92);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 2px 8px rgba(91, 112, 151, 0.08);
+}
+
+.ghost-btn:focus-visible {
+  outline: 2px solid rgba(96, 154, 214, 0.7);
+  outline-offset: 3px;
+}
+
+.ghost-btn:disabled,
+.ghost-btn.is-disabled,
+.ghost-btn--disabled,
+.ghost-btn[aria-disabled="true"] {
+  opacity: 0.42;
+  pointer-events: none;
+  filter: grayscale(0.7);
+}
+
+.ghost-btn--small {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 10.5px;
+}
+
+.ghost-btn--primary {
+  color: #3f5f89;
+  background:
+    linear-gradient(135deg, rgba(135, 206, 250, 0.2), rgba(177, 156, 217, 0.17) 56%, rgba(232, 185, 200, 0.14));
+  box-shadow:
+    0 8px 22px rgba(108, 143, 189, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.ghost-btn--primary::before {
+  opacity: 0.9;
+}
+
+.ghost-btn--primary:hover {
+  color: #345375;
+  background:
+    linear-gradient(135deg, rgba(135, 206, 250, 0.3), rgba(177, 156, 217, 0.23) 56%, rgba(232, 185, 200, 0.18));
+  box-shadow:
+    0 0 20px rgba(135, 206, 250, 0.28),
+    0 10px 26px rgba(108, 143, 189, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.ghost-btn.is-on,
+.ghost-btn[aria-pressed="true"] {
+  color: #3e6089;
+  background:
+    linear-gradient(135deg, rgba(135, 206, 250, 0.24), rgba(177, 156, 217, 0.2) 58%, rgba(232, 185, 200, 0.16));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 0 16px rgba(135, 206, 250, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.ghost-btn.is-on::before,
+.ghost-btn[aria-pressed="true"]::before {
+  opacity: 1;
+}
+
+.ghost-btn--small.play-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 11.5px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--ink-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.icon-btn:hover {
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.62);
+  transform: rotate(90deg);
+}
+
+.icon-btn:active {
+  transform: rotate(90deg) scale(0.94);
+}
+
+@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .ghost-btn {
+    border: 1px solid;
+    border-image: var(--ghost-stroke) 1;
+    border-radius: 4px;
+  }
+
+  .ghost-btn--small {
+    border-radius: 4px;
+  }
+}
+
+/* 桌面端隐藏抽屉入口；平板断点才显示 */
+.ghost-btn.panel-toggle {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .ghost-btn.panel-toggle {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 767px) {
+  .ghost-btn.panel-toggle {
+    display: none !important;
+  }
+}
+
+/* 面板关闭按钮：只在平板抽屉里出现 */
+.icon-btn.panel__close {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .panel--controls .icon-btn.panel__close {
+    display: grid;
+  }
+}
+
+@media (max-width: 767px) {
+  .icon-btn.panel__close {
+    display: none !important;
+  }
+}

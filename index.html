@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FloatNote 是一个纯静态、无后端、无需构建的多乐器简谱演奏器。用 QWERTY 键盘演奏五种乐器，在柔光与粒子中看见声音。">
+  <meta name="theme-color" content="#f4f2f8">
+  <title>FloatNote · 多乐器简谱演奏器</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2387cefa'/%3E%3Cstop offset='1' stop-color='%23b19cd9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='%23f8f6fb'/%3E%3Cpath d='M40 14v26a8 8 0 1 1-4-7V22l-14 4v-6l14-4z' fill='url(%23g)'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles/global.css">
+  <link rel="stylesheet" href="styles/button.css">
+  <link rel="stylesheet" href="styles/theme.css">
+  <!-- 仅主题调色面板使用；async 保证 CDN 不稳定时不会阻塞解析、演奏与渲染。 -->
+  <script id="jqueryCdn" async src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="page-atmosphere" aria-hidden="true">
+    <span class="atmosphere-orb atmosphere-orb--one"></span>
+    <span class="atmosphere-orb atmosphere-orb--two"></span>
+    <span class="atmosphere-orb atmosphere-orb--three"></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="./index.html" aria-label="FloatNote 首页">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" role="presentation">
+          <path d="M25.5 6.5v20.2a6.3 6.3 0 1 1-3.2-5.5V11.9l-10.4 3v-4.6l13.6-3.8z"></path>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <strong>FloatNote</strong>
+        <small>让简谱浮起来</small>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="站点导航">
+      <a class="nav-link is-active" href="./index.html" aria-current="page">演奏台</a>
+      <a class="nav-link" href="./about.html">关于</a>
+      <a class="nav-link" href="./about.html#license">开源说明</a>
+      <button class="ghost-btn ghost-btn--small" id="audioWakeBtn" type="button">唤醒声音</button>
+      <span class="audio-status" id="audioStatus" data-state="locked" title="音频引擎状态">
+        <span class="audio-status__dot" aria-hidden="true"></span>
+        <span id="audioStatusText">音频待唤醒</span>
+      </span>
+    </nav>
+
+    <button class="ghost-btn ghost-btn--small panel-toggle" id="panelToggle" type="button" aria-controls="controlPanel" aria-expanded="false">
+      控制台
+    </button>
+  </header>
+
+  <main class="app-shell">
+    <div class="drawer-backdrop" id="panelBackdrop" hidden></div>
+
+    <aside class="panel panel--controls" id="controlPanel" aria-label="控制面板">
+      <div class="panel__topline">
+        <span class="eyebrow">Control room</span>
+        <button class="icon-btn panel__close" id="panelClose" type="button" aria-label="收起控制面板">×</button>
+      </div>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>乐器</h2>
+          <span class="section-note">五种音色，五种光</span>
+        </div>
+        <div class="instrument-grid" id="instrumentGrid" role="group" aria-label="选择乐器"></div>
+        <div class="range-card">
+          <div class="range-card__top">
+            <span>当前音域</span>
+            <strong id="rangeLabel">A0 – C8</strong>
+          </div>
+          <p id="rangeHint">88 键完整音域</p>
+          <div class="range-card__actions">
+            <button class="text-btn" id="retrySoundfontBtn" type="button" hidden>重试采样音色</button>
+            <span class="range-card__mode" id="soundModeLabel">内置合成音色</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>声音</h2>
+          <span class="section-note">音量、混响与速度</span>
+        </div>
+
+        <label class="control-row" for="tempoRange">
+          <span class="control-row__label">速度 <output id="tempoValue" for="tempoRange">84</output> BPM</span>
+          <input class="range-input" id="tempoRange" type="range" min="20" max="300" step="1" value="84">
+        </label>
+
+        <label class="control-row" for="masterVolume">
+          <span class="control-row__label">总音量 <output id="masterVolumeValue">78%</output></span>
+          <input class="range-input" id="masterVolume" type="range" min="0" max="100" step="1" value="78">
+        </label>
+
+        <label class="control-row" for="instrumentVolume">
+          <span class="control-row__label">乐器音量 <output id="instrumentVolumeValue">82%</output></span>
+          <input class="range-input" id="instrumentVolume" type="range" min="0" max="100" step="1" value="82">
+        </label>
+
+        <label class="control-row" for="reverbMix">
+          <span class="control-row__label">混响湿度 <output id="reverbMixValue">30%</output></span>
+          <input class="range-input" id="reverbMix" type="range" min="0" max="100" step="1" value="30">
+        </label>
+
+        <div class="inline-controls">
+          <button class="ghost-btn ghost-btn--small is-on" id="reverbToggle" type="button" aria-pressed="true">混响开</button>
+          <label class="select-wrap" for="reverbPreset">
+            <span class="sr-only">混响预设</span>
+            <select id="reverbPreset">
+              <option value="long">长混响</option>
+              <option value="short">短混响</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="octave-control">
+          <span class="control-row__label">键盘基准八度</span>
+          <div class="segmented" id="octaveSelector" role="group" aria-label="键盘基准八度">
+            <button type="button" data-octave="-1">−1</button>
+            <button type="button" data-octave="0" class="is-active">0</button>
+            <button type="button" data-octave="1">+1</button>
+          </div>
+          <p class="fine-print">在 Ctrl / Shift 键被浏览器占用时，用这里整体移八度。</p>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>调色</h2>
+          <span class="section-note">粒子亮度 · 密度 · 主色</span>
+        </div>
+
+        <label class="control-row" for="particleBrightness">
+          <span class="control-row__label">粒子亮度 <output id="brightnessValue">100%</output></span>
+          <input class="range-input" id="particleBrightness" type="range" min="30" max="180" step="1" value="100">
+        </label>
+
+        <label class="control-row" for="particleDensity">
+          <span class="control-row__label">粒子密度 <output id="densityValue">100%</output></span>
+          <input class="range-input" id="particleDensity" type="range" min="30" max="200" step="1" value="100">
+        </label>
+
+        <div class="color-control">
+          <label class="color-picker" for="themeColor">
+            <span class="color-picker__swatch" id="colorSwatch" aria-hidden="true"></span>
+            <span class="sr-only">粒子主色调</span>
+            <input id="themeColor" type="color" value="#a9c4ee">
+          </label>
+          <label class="text-field text-field--compact">
+            <span>HEX</span>
+            <input id="hexInput" type="text" value="#a9c4ee" maxlength="7" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="text-field text-field--compact">
+            <span>RGB</span>
+            <input id="rgbInput" type="text" value="169, 196, 238" autocomplete="off" spellcheck="false">
+          </label>
+          <button class="ghost-btn ghost-btn--small" id="copyColorBtn" type="button">复制色值</button>
+          <button class="text-btn" id="resetThemeBtn" type="button">恢复默认</button>
+        </div>
+        <p class="fine-print" id="themeJqStatus">调色面板由 jQuery CDN 驱动；离线时自动改用原生事件。</p>
+      </section>
+
+      <section class="panel-section">
+        <details class="instrument-table-details">
+          <summary>
+            <span>乐器参数总览</span>
+            <span class="summary-hint">音域 · 流派 · 混响 · 键位</span>
+          </summary>
+          <div class="table-scroll" id="instrumentTableWrap"></div>
+        </details>
+      </section>
+
+      <section class="panel-section panel-section--last">
+        <div class="section-heading">
+          <h2>演奏提示</h2>
+          <span class="section-note">QWERTY · 长按延音</span>
+        </div>
+        <ul class="shortcut-list">
+          <li><kbd>Space</kbd><span>播放 / 暂停</span></li>
+          <li><kbd>Esc</kbd><span>停止全部声音</span></li>
+          <li><kbd>长按</kbd><span>持续发声，切换修饰键时实时变调</span></li>
+        </ul>
+        <p class="fine-print">浏览器可能拦截 Ctrl+W 等系统快捷键；遇到冲突时请使用上方基准八度按钮与界面控件。</p>
+      </section>
+    </aside>
+
+    <section class="stage-column" aria-label="演奏舞台">
+      <div class="stage-head">
+        <div class="stage-title">
+          <span class="eyebrow">Now playing</span>
+          <h1 id="stageInstrument">钢琴</h1>
+          <p id="stageVisual">粒子从键面上升，音越高光柱越细、越亮。</p>
+        </div>
+        <div class="stage-meta" aria-label="乐谱信息">
+          <span class="chip" id="keyChip">1=C</span>
+          <span class="chip" id="meterChip">4/4</span>
+          <span class="chip" id="bpmChip">♩=84</span>
+        </div>
+      </div>
+
+      <div class="stage-frame">
+        <canvas id="stageCanvas" aria-label="乐器光效与粒子可视化舞台">
+          你的浏览器不支持 Canvas 2D，请使用 Chrome、Edge 或 Firefox 的现代版本。
+        </canvas>
+        <div class="stage-note" id="noteReadout" aria-live="polite">
+          <span class="stage-note__degree">—</span>
+          <span class="stage-note__name">等待第一个音</span>
+        </div>
+        <div class="stage-hint" id="stageHint">
+          <span class="stage-hint__key">A</span>
+          <span>按 A–J 开始演奏；长按与修饰键可换把位、超吹、八度。</span>
+        </div>
+        <div class="stage-loading" id="stageLoading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span>正在唤醒声音…</span>
+        </div>
+        <div class="stage-corner" aria-hidden="true">
+          <span id="stageEffectName">垂直光柱</span>
+          <span class="stage-corner__line"></span>
+          <span>FloatNote</span>
+        </div>
+      </div>
+
+      <div class="keyboard-strip" id="keyboardStrip" aria-label="当前乐器的键盘映射提示"></div>
+
+      <div class="transport">
+        <div class="transport__row">
+          <button class="ghost-btn ghost-btn--primary play-btn" id="playBtn" type="button" aria-label="播放">
+            <span class="play-btn__icon" id="playIcon" aria-hidden="true">▶</span>
+            <span id="playLabel">播放</span>
+          </button>
+          <button class="ghost-btn ghost-btn--small" id="stopBtn" type="button">停止</button>
+          <button class="ghost-btn ghost-btn--small" id="metronomeBtn" type="button" aria-pressed="false">节拍器</button>
+          <button class="ghost-btn ghost-btn--small" id="loopBtn" type="button" aria-pressed="false">整曲循环</button>
+          <span class="transport__time"><span id="currentTime">0:00</span><span class="divider">/</span><span id="totalTime">0:00</span></span>
+          <span class="loop-chip" id="loopChip">未循环</span>
+        </div>
+
+        <div class="progress-shell" id="progressShell">
+          <div class="progress-fill" id="progressFill"></div>
+          <div class="progress-ab" id="progressAb" hidden></div>
+          <input class="progress-range" id="progressRange" type="range" min="0" max="1" step="0.001" value="0" aria-label="播放进度">
+        </div>
+
+        <div class="transport__ab">
+          <span class="transport__ab-label">A–B 循环</span>
+          <button class="ghost-btn ghost-btn--small" id="setABtn" type="button">标记 A</button>
+          <button class="ghost-btn ghost-btn--small" id="setBBtn" type="button">标记 B</button>
+          <button class="ghost-btn ghost-btn--small" id="abLoopBtn" type="button" aria-pressed="false">启用 A–B</button>
+          <button class="text-btn" id="clearABtn" type="button">清除</button>
+          <span class="ab-status" id="abStatus">未标记</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel panel--score" aria-label="简谱与编配面板">
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>简谱</h2>
+          <span class="section-note">粘贴文本，解析成声音</span>
+        </div>
+        <label class="sr-only" for="scoreInput">简谱文本</label>
+        <textarea class="score-input" id="scoreInput" rows="9" spellcheck="false" placeholder="1=C 4/4 ♩=84&#10;1 1 5 5 | 6 6 5 - | 4 4 3 3 | 2 2 1 - |"></textarea>
+        <div class="button-row">
+          <button class="ghost-btn ghost-btn--primary" id="parseBtn" type="button">解析并载入</button>
+          <button class="ghost-btn ghost-btn--small" id="sampleBtn" type="button">示例</button>
+          <button class="ghost-btn ghost-btn--small" id="clearBtn" type="button">清空</button>
+          <button class="ghost-btn ghost-btn--small" id="copyAiPromptBtn" type="button">复制格式给AI</button>
+        </div>
+        <div class="score-status" id="scoreStatus" role="status" aria-live="polite">
+          <span class="score-status__icon" aria-hidden="true">·</span>
+          <span>载入示例后即可播放。</span>
+        </div>
+        <details class="syntax-help">
+          <summary>简谱书写格式</summary>
+          <div class="syntax-help__body">
+            <p><code>1=C 4/4 ♩=80</code> 调号、拍号、速度；不写则默认 C 调、4/4、80 BPM。</p>
+            <ul>
+              <li><code>1 2 3</code> 四分音符；<code>1_</code> 八分音符；<code>1-</code> 二分音符；单独的 <code>-</code> 延长前一拍。</li>
+              <li><code>1.</code> 低音；<code>1'</code> 高音；<code>#1</code> 升半音；<code>1~</code> 连音线。</li>
+              <li><code>|</code> 分隔小节；<code>0</code> 休止符（兼容扩展）；空格分隔音符。</li>
+            </ul>
+            <p class="fine-print">暂不支持装饰音、滑音、强弱记号、反复记号、图片 OCR 与五线谱。</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>搜谱</h2>
+          <span class="section-note">新窗口搜索，手动复制</span>
+        </div>
+        <div class="search-row">
+          <label class="sr-only" for="searchInput">曲名</label>
+          <input class="text-input" id="searchInput" type="search" placeholder="例如：茉莉花" maxlength="80" autocomplete="off">
+          <label class="select-wrap select-wrap--small" for="searchEngine">
+            <span class="sr-only">搜索引擎</span>
+            <select id="searchEngine">
+              <option value="bing">必应</option>
+              <option value="baidu">百度</option>
+              <option value="google">Google</option>
+            </select>
+          </label>
+          <button class="ghost-btn ghost-btn--small" id="searchBtn" type="button">搜索</button>
+        </div>
+        <p class="fine-print">在新标签页复制简谱文本，回到这里粘贴，再点击「解析并载入」。应用不做爬虫，也不读取搜索页内容。</p>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>智能编配</h2>
+          <span class="section-note">按乐谱特征推荐</span>
+        </div>
+        <button class="ghost-btn ghost-btn--small arrange-btn" id="arrangeBtn" type="button">分析乐谱并推荐</button>
+        <div class="arrange-cards" id="arrangeCards">
+          <p class="empty-state">载入乐谱后，会给出流派、主奏、伴奏、混响与速度建议。所有推荐都可以手动覆盖。</p>
+        </div>
+      </section>
+
+      <section class="panel-section panel-section--last">
+        <div class="section-heading">
+          <h2>乐谱预览</h2>
+          <span class="section-note" id="previewSummary">尚未载入</span>
+        </div>
+        <div class="score-preview" id="scorePreview">
+          <p class="empty-state">解析后的音符会按小节排在这里，越界音符会获得一滴淡 amber 标记。</p>
+        </div>
+        <div class="preview-legend">
+          <span><i class="legend-dot legend-dot--normal"></i>音域内</span>
+          <span><i class="legend-dot legend-dot--warn"></i>已自动移八度</span>
+          <span><i class="legend-dot legend-dot--accent"></i>正在发声</span>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>FloatNote</strong>
+      <span>柔光、烟雾与五种乐器，在同一页里轻声呼吸。</span>
+    </div>
+    <div class="site-footer__links">
+      <a href="./about.html">关于项目</a>
+      <a href="./about.html#notation">简谱规范</a>
+      <a href="./about.html#license">MIT 与第三方许可</a>
+      <span>纯静态 · 无后端 · 无构建</span>
+    </div>
+  </footer>
+
+  <div class="toast-layer" id="toastLayer" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <noscript>
+    <div class="noscript-banner">FloatNote 需要 JavaScript 才能解析简谱、播放声音并绘制粒子。</div>
+  </noscript>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

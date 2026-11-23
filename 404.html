@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FloatNote · 这一页飘走了。">
+  <meta name="theme-color" content="#f4f2f8">
+  <title>404 · 这一页飘走了 · FloatNote</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2387cefa'/%3E%3Cstop offset='1' stop-color='%23b19cd9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='%23f8f6fb'/%3E%3Cpath d='M40 14v26a8 8 0 1 1-4-7V22l-14 4v-6l14-4z' fill='url(%23g)'/%3E%3C/svg%3E">
+  <style>
+    /* 404 页可能在任意路径下被 GitHub Pages 返回，先给一层轻量骨架，完整样式随后注入。 */
+    :root { color-scheme: light; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      color: #2d3448;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background:
+        radial-gradient(1000px 700px at 12% -10%, #e9f3ff, transparent 62%),
+        radial-gradient(900px 650px at 92% 4%, #f8eaf2, transparent 58%),
+        linear-gradient(180deg, #f8f6fa 0%, #f2f5fb 55%, #f8f3f6 100%);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .error-main { min-height: calc(100vh - 62px); }
+    .error-actions a { display: inline-block; margin: 4px; padding: 9px 15px; border: 1px solid rgba(93, 130, 176, 0.28); border-radius: 999px; }
+  </style>
+</head>
+<body class="subpage">
+  <div class="page-atmosphere" aria-hidden="true">
+    <span class="atmosphere-orb atmosphere-orb--one"></span>
+    <span class="atmosphere-orb atmosphere-orb--two"></span>
+    <span class="atmosphere-orb atmosphere-orb--three"></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="./index.html" data-root-link="index.html" aria-label="FloatNote 首页">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" role="presentation">
+          <path d="M25.5 6.5v20.2a6.3 6.3 0 1 1-3.2-5.5V11.9l-10.4 3v-4.6l13.6-3.8z"></path>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <strong>FloatNote</strong>
+        <small>让简谱浮起来</small>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="站点导航">
+      <a class="nav-link" href="./index.html" data-root-link="index.html">演奏台</a>
+      <a class="nav-link" href="./about.html" data-root-link="about.html">关于</a>
+      <a class="ghost-btn ghost-btn--small" href="./index.html" data-root-link="index.html">返回首页</a>
+    </nav>
+  </header>
+
+  <main class="error-main">
+    <canvas class="ambient-canvas error-ambient" id="errorCanvas" aria-label="漂浮的光点"></canvas>
+    <div class="error-content">
+      <span class="error-code" aria-hidden="true">404</span>
+      <h1>这一页飘走了。</h1>
+      <p>
+        它可能被移动、改名，或者从来没有存在过。光点还在飘，演奏台还在等你。
+        回到首页，贴上你的简谱，选一件乐器。
+      </p>
+      <div class="error-actions">
+        <a class="ghost-btn ghost-btn--primary" href="./index.html" data-root-link="index.html">回到演奏台</a>
+        <a class="ghost-btn" href="./about.html" data-root-link="about.html">了解 FloatNote</a>
+        <a class="ghost-btn ghost-btn--small" href="./about.html#notation" data-root-link="about.html#notation">简谱规范</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div>
+      <strong>FloatNote</strong>
+      <span>一个纯静态的多乐器简谱演奏器。</span>
+    </div>
+    <div class="site-footer__links">
+      <a href="./index.html" data-root-link="index.html">演奏台</a>
+      <a href="./about.html" data-root-link="about.html">关于</a>
+      <a href="./about.html#license" data-root-link="about.html#license">开源说明</a>
+      <span>404 · floatnote</span>
+    </div>
+  </footer>
+
+  <script>
+    /*
+     * GitHub Pages 在任意缺失路径下都会返回 404.html，而浏览器地址栏不会变。
+     * 因此不能假设 ./styles 一定指向仓库根目录：向上逐级探测仓库根，再注入样式与光效。
+     */
+    (function () {
+      const candidates = [];
+      let dir = location.pathname.endsWith('/')
+        ? location.pathname
+        : location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1) || '/';
+      while (dir) {
+        if (!candidates.includes(dir)) candidates.push(dir);
+        if (dir === '/') break;
+        const parent = dir.replace(/[^/]+\/$/, '');
+        if (!parent || parent === dir) break;
+        dir = parent.endsWith('/') ? parent : parent + '/';
+      }
+
+      async function findBase() {
+        for (const candidate of candidates) {
+          try {
+            const response = await fetch(candidate + 'src/pageAmbient.js', {
+              method: 'HEAD',
+              cache: 'no-store',
+            });
+            if (response.ok) return candidate;
+          } catch {
+            /* 尝试下一个祖先目录 */
+          }
+        }
+        return './';
+      }
+
+      function injectStyles(base) {
+        for (const name of ['global', 'button', 'theme', 'pages']) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `${base}styles/${name}.css`;
+          document.head.appendChild(link);
+        }
+      }
+
+      function fixLinks(base) {
+        for (const anchor of document.querySelectorAll('[data-root-link]')) {
+          anchor.setAttribute('href', base + anchor.getAttribute('data-root-link'));
+        }
+      }
+
+      async function boot() {
+        const base = await findBase();
+        document.documentElement.dataset.base = base;
+        injectStyles(base);
+        fixLinks(base);
+        try {
+          const module = await import(`${base}src/pageAmbient.js`);
+          module.startAmbient(document.getElementById('errorCanvas'), { color: '#b5a7dd' });
+        } catch (error) {
+          console.warn('[FloatNote] 404 ambient unavailable:', error);
+        }
+      }
+
+      boot();
+    })();
+  </script>
+</body>
+</html>

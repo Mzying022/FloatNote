@@ -1,0 +1,12 @@
+# 开发资料（含中文名规范文档，不随站点发布）
+*.docx
+
+# 系统 / 编辑器文件
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 依赖 / 临时文件（本项目为纯静态，通常不会出现）
+node_modules/
+*.log
