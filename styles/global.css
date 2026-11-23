@@ -1247,6 +1247,16 @@ button.keycap.is-held {
   min-width: 0;
 }
 
+.library-demo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 .library-list {
   display: flex;
   flex-direction: column;

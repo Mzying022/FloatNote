@@ -24,6 +24,16 @@
 
 必须通过 HTTP 静态服务打开。ES Modules 在 `file://` 下会被浏览器拦截，双击 HTML 文件会报错。
 
+### Windows 一键启动（推荐）
+
+直接双击项目根目录的 **`start.bat`**：它会自动启动本地服务器并在约 2 秒后打开浏览器访问 `http://localhost:8080/`。弹出的黑色命令行窗口就是服务器，**保持打开**，用完关掉即停止服务。
+
+> 前置条件：需要安装 Python 并带有官方启动器 `py`（`C:\Windows\py.exe`，安装 Python 时默认附带）。脚本用的是 `py -m http.server 8080`，而不是 `python`——因为 Windows 应用商店的 `python` 占位程序会静默退出，导致服务起不来。若未安装 `py`，请用下面的命令行方式。
+>
+> 若提示 `8080` 端口被占用，先关掉占用端口的程序，或按下面的命令行方式换一个端口（如 8090）。
+
+### 命令行启动（跨平台）
+
 ```bash
 # 任选一种
 python -m http.server 8080
@@ -49,6 +59,7 @@ FloatNote/
 ├── index.html                  # 演奏台主页面
 ├── about.html                  # 关于、原理、简谱规范与许可
 ├── 404.html                    # GitHub Pages 404 页面
+├── start.bat                   # Windows 一键启动（本地服务器 + 自动开浏览器）
 ├── LICENSE
 ├── README.md
 ├── .nojekyll                   # 让 GitHub Pages 不做 Jekyll 处理
@@ -64,6 +75,8 @@ FloatNote/
 │   ├── app.js                  # UI、播放调度、键盘映射、搜谱/编配交互
 │   ├── audioEngine.js          # AudioContext、采样/合成、ADSR、混响、节拍器
 │   ├── autoArranger.js         # 流派判定与编配推荐
+│   ├── chords.js               # 逐小节和弦进行生成与低音线
+│   ├── demoScores.js           # 公有领域示例曲库（7 首经典曲目）
 │   ├── canvasRender.js         # 粒子池、五种乐器光效、节拍光标、A–B 标记
 │   ├── instruments.js          # 音域、音色文件、混响、合成兜底参数
 │   ├── pageAmbient.js          # 关于页 / 404 页的轻量环境光

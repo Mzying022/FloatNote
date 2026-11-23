@@ -21,6 +21,7 @@ import {
 } from './instruments.js';
 import { arrangeScore } from './autoArranger.js';
 import { buildChordTrack } from './chords.js';
+import { DEMO_SCORES } from './demoScores.js';
 import {
   clamp,
   copyText,
@@ -39,6 +40,7 @@ import {
 
 const THEME_KEY = 'floatnote.theme.v1';
 const LIBRARY_KEY = 'floatnote.library.v1';
+const DEMO_SEED_KEY = 'floatnote.demo-seeded.v1';
 const DEFAULT_THEME = Object.freeze({
   color: '#a9c4ee',
   brightness: 1,
@@ -202,6 +204,7 @@ const els = {
   saveSongBtn: document.getElementById('saveSongBtn'),
   libraryList: document.getElementById('libraryList'),
   libraryCount: document.getElementById('libraryCount'),
+  restoreDemoBtn: document.getElementById('restoreDemoBtn'),
   chordsToggle: document.getElementById('chordsToggle'),
   chordVolume: document.getElementById('chordVolume'),
   chordVolumeValue: document.getElementById('chordVolumeValue'),
@@ -424,6 +427,42 @@ function loadLibrary() {
 
 function saveLibrary(list) {
   return safeStorageSet(LIBRARY_KEY, JSON.stringify(list));
+}
+
+/**
+ * 把公有领域示例曲补进曲库。
+ * 用固定 id 识别，已存在的跳过，不覆盖用户改名/内容。
+ * 返回 { added, total }。
+ */
+function seedDemoScores() {
+  const list = loadLibrary();
+  const existing = new Set(list.map((song) => song.id));
+  const now = Date.now();
+  let added = 0;
+  DEMO_SCORES.forEach((demo, index) => {
+    if (existing.has(demo.id)) return;
+    list.unshift({
+      id: demo.id,
+      title: demo.title,
+      text: demo.text,
+      stats: demo.stats,
+      demo: true,
+      createdAt: now - index,
+      updatedAt: now - index,
+    });
+    added += 1;
+  });
+  if (added > 0 && !saveLibrary(list)) {
+    return { added: 0, total: list.length, failed: true };
+  }
+  return { added, total: list.length };
+}
+
+/** 首次使用自动注入一次示例曲库。 */
+function ensureDemoSeeded() {
+  if (safeStorageGet(DEMO_SEED_KEY, null)) return;
+  seedDemoScores();
+  safeStorageSet(DEMO_SEED_KEY, '1');
 }
 
 /** 从简谱文本猜测曲名：优先标题注释行，否则取第一小节片段。 */
@@ -2208,6 +2247,19 @@ function bindControls() {
 
   els.saveSongBtn?.addEventListener('click', addToLibrary);
   els.libraryList?.addEventListener('click', handleLibraryClick);
+  els.restoreDemoBtn?.addEventListener('click', () => {
+    const result = seedDemoScores();
+    if (result.failed) {
+      toast('恢复失败：浏览器存储不可用。', 'error', 3000);
+      return;
+    }
+    renderLibrary();
+    if (result.added > 0) {
+      toast(`已补回 ${result.added} 首示例曲。`, 'ok', 2400);
+    } else {
+      toast('示例曲都已存在于曲库中。', 'info', 2400);
+    }
+  });
 
   els.parseBtn.addEventListener('click', () => loadScore(els.scoreInput.value));
   els.sampleBtn.addEventListener('click', () => {
@@ -2400,6 +2452,7 @@ function init() {
   applyThemeToUI();
   bindControls();
   bindThemePanelWhenReady();
+  ensureDemoSeeded();
   renderLibrary();
 
   els.reverbPreset.value = currentInstrument().reverb;
